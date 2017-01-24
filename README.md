@@ -9,9 +9,9 @@ TODO
 ## Development
 1. Install node 6.9.4 https://nodejs.org/en/
 2. `npm install`
-3. Create `.env` file with something like 
+3. Create `.env` file with something like
     ```
-    
+
     export GOOGLE_CLIENT_ID=CLIENT_ID
     export GOOGLE_CLIENT_SECRET=SECRET
     export HOST="localhost"
