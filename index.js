@@ -10,8 +10,10 @@ const httpProxy = require('http-proxy')
 const proxy = httpProxy.createProxyServer({})
 
 const app = express()
+
 app.use(session({
   secret: process.env.SESSION_SECRET,
+  cookie: {domain: '.' + process.env.DOMAIN},
   resave: false,
   saveUninitialized: true,
   store: new FileStore()
@@ -111,7 +113,10 @@ const proxyToService = function (req, res, service, privileges) {
     res.status(500).send(`Configuration error, service ${service} not defined`)
   }
   const target = `http://${service}:${port}`
-  proxy.web(req, res, {target})
+  proxy.web(req, res, {
+    target,
+    headers: {dcc_privileges: privileges, dcc_email: req.user.email}
+  })
 }
 
 const httpsServer = https.createServer({key, cert}, app)
