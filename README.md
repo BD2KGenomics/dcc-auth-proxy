@@ -7,5 +7,5 @@
 TODO
 
 ## Development
-1. Install node 6.9.4
-2. `npm install` https://nodejs.org/en/
+1. Install node 6.9.4 https://nodejs.org/en/
+2. `npm install`
