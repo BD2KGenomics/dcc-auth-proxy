@@ -1,0 +1,26 @@
+{
+  "name": "bouncer",
+  "version": "1.0.0",
+  "description": "Bouncer makes sure only authentic, authorized users access downstream services.",
+  "main": "index.js",
+  "scripts": {
+    "start": "source .env; node_modules/.bin/nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "docker build -t quay.io/ucsc_cgl/dcc-auth-proxy ."
+  },
+  "author": "Mike Risse",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.14.0",
+    "http-proxy": "^1.16.2",
+    "passport": "^0.3.2",
+    "passport-google-oauth20": "^1.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^3.14.0",
+    "eslint-config-standard": "^6.2.1",
+    "eslint-plugin-promise": "^3.4.0",
+    "eslint-plugin-standard": "^2.0.1",
+    "nodemon": "^1.11.0"
+  }
+}
