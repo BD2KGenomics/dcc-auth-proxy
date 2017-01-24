@@ -52,39 +52,6 @@ proxy.on('error', function (e) {
   console.error('proxy error', e)
 })
 
-app.get('/', function (req, res) {
-  console.log(req.hostname)
-  if (!req.user) {
-    res.send(`<a href="/auth/google">Login with Google</a>`)
-  } else {
-    res.send(`You are currently logged in as ${req.user.name} <a href="/logout">Logout</a>`)
-  }
-})
-
-app.get('/service/:service', function (req, res) {
-  if (!req.user) {
-    req.session.redirect = req.url
-    return res.redirect(`/auth/google`)
-  }
-  const service = req.params.service
-  const privileges = (accessControl[req.user.email] || []).filter((priv) => {
-    return priv.startsWith(service)
-  }).map((priv) => {
-    return priv.split('.')[1]
-  })
-
-  if (privileges.length > 0) {
-    const port = process.env[`SERVICE_${service.toUpperCase()}_PORT`]
-    if (!port) {
-      res.status(500).send(`Configuration error, service ${service} not defined`)
-    }
-    const target = `http://${service}:${port}`
-    proxy.web(req, res, {target})
-  } else {
-    res.status(401).send('Access denied')
-  }
-})
-
 app.get('/auth/google', function (req, res, next) {
   passport.authenticate('google', {
     scope: ['profile', 'email']
@@ -106,7 +73,47 @@ app.get('/logout', function (req, res) {
   res.redirect('/')
 })
 
-const httpsServer = https.createServer({key, cert}, app)
+app.get('*', function (req, res) {
+  const service = req.hostname.split('.')[0]
+  if (service === 'proxy') return renderFrontPage(req, res)
+  if (!req.user) return res.redirect('/auth/google')
 
-console.log(`server listening on port ${port}`)
+  const privileges = getPrivileges(req.user.email, service)
+  if (privileges.length > 0) {
+    return proxyToService(req, res, service, privileges)
+  } else {
+    res.status(401).send('Access denied')
+  }
+})
+
+// returns privileges based on access control
+// Ex: if accessControl contained {"mike@example.com": [redwood.admin]}
+//     and service was redwood ['admin'] would be returned
+const getPrivileges = function (email, service) {
+  return (accessControl[email] || []).filter((priv) => {
+    return priv.startsWith(service)
+  }).map((priv) => {
+    return priv.split('.')[1]
+  })
+}
+
+const renderFrontPage = function (req, res) {
+  if (!req.user) {
+    res.send(`<a href="/auth/google">Login with Google</a>`)
+  } else {
+    res.send(`You are currently logged in as ${req.user.name} <a href="/logout">Logout</a>`)
+  }
+}
+
+const proxyToService = function (req, res, service, privileges) {
+  const port = process.env[`SERVICE_${service.toUpperCase()}_PORT`]
+  if (!port) {
+    res.status(500).send(`Configuration error, service ${service} not defined`)
+  }
+  const target = `http://${service}:${port}`
+  proxy.web(req, res, {target})
+}
+
+const httpsServer = https.createServer({key, cert}, app)
 httpsServer.listen(port)
+console.log(`server listening on port ${port}`)
