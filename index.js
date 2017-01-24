@@ -9,11 +9,20 @@ const https = require('https')
 const httpProxy = require('http-proxy')
 const proxy = httpProxy.createProxyServer({})
 
+const requiredEnvVars = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'HOST', 'PORT', 'SESSION_SECRET', 'COOKIE_DOMAIN']
+
+requiredEnvVars.map((envVar) => {
+  if (!process.env[envVar]) {
+    console.error('must define environment variable', envVar)
+    process.exit(1)
+  }
+})
+
 const app = express()
 
 app.use(session({
   secret: process.env.SESSION_SECRET,
-  cookie: {domain: '.' + process.env.DOMAIN},
+  cookie: {domain: '.' + process.env.COOKIE_DOMAIN},
   resave: false,
   saveUninitialized: true,
   store: new FileStore()
@@ -39,7 +48,7 @@ passport.deserializeUser(function (user, done) {
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: `${process.env.HOST}/auth/google/callback`
+  callbackURL: `https://${process.env.HOST}:${process.env.PORT}/auth/google/callback`
 }, function (accessToken, refreshToken, profile, cb) {
   // TODO handle a response with multiple emails
   // so far i've only seen a responses of the form:
@@ -72,14 +81,16 @@ app.get('/auth/google/callback', passport.authenticate('google', {failureRedirec
 
 app.get('/logout', function (req, res) {
   req.logout()
-  res.redirect(`https://${process.env.PROXY_DOMAIN}:${process.env.PORT}`)
+  res.redirect(`https://${process.env.HOST}:${process.env.PORT}`)
 })
 
 app.get('*', function (req, res) {
   const service = req.hostname.split('.')[0]
   if (service === 'proxy') return renderFrontPage(req, res)
-  if (!req.user) return res.redirect('/auth/google')
-
+  if (!req.user) {
+    req.session.redirect = `https://${req.hostname}:${process.env.PORT}${req.url}`
+    return res.redirect('/auth/google')
+  }
   const privileges = getPrivileges(req.user.email, service)
   if (privileges.length > 0) {
     return proxyToService(req, res, service, privileges)
