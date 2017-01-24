@@ -72,7 +72,7 @@ app.get('/auth/google/callback', passport.authenticate('google', {failureRedirec
 
 app.get('/logout', function (req, res) {
   req.logout()
-  res.redirect('/')
+  res.redirect(`https://${process.env.PROXY_DOMAIN}:${process.env.PORT}`)
 })
 
 app.get('*', function (req, res) {
