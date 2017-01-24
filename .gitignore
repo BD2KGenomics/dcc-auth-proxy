@@ -3,3 +3,4 @@ node_modules
 ssl.crt
 ssl.key
 accessControl.json
+sessions

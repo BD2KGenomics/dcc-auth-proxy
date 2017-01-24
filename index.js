@@ -1,13 +1,21 @@
-// probably should have an http port that just redirects to https
+// TODO probably should have an http port that just redirects to https
 
 const passport = require('passport')
 const session = require('express-session')
+const FileStore = require('session-file-store')(session)
 const express = require('express')
 const fs = require('fs')
 const https = require('https')
+const httpProxy = require('http-proxy')
+const proxy = httpProxy.createProxyServer({})
 
 const app = express()
-app.use(session({secret: process.env.SESSION_SECRET, resave: false, saveUninitialized: true}))
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: true,
+  store: new FileStore()
+}))
 app.use(passport.initialize())
 app.use(passport.session())
 const GoogleStrategy = require('passport-google-oauth20').Strategy
@@ -40,8 +48,12 @@ passport.use(new GoogleStrategy({
   return cb(null, {name: profile.displayName, email: profile.emails[0].value})
 }))
 
-// respond with "hello world" when a GET request is made to the homepage
+proxy.on('error', function (e) {
+  console.error('proxy error', e)
+})
+
 app.get('/', function (req, res) {
+  console.log(req.hostname)
   if (!req.user) {
     res.send(`<a href="/auth/google">Login with Google</a>`)
   } else {
@@ -55,19 +67,27 @@ app.get('/service/:service', function (req, res) {
     return res.redirect(`/auth/google`)
   }
   const service = req.params.service
-  const privileges = accessControl[req.user.email].filter((priv) => {
+  const privileges = (accessControl[req.user.email] || []).filter((priv) => {
     return priv.startsWith(service)
   }).map((priv) => {
     return priv.split('.')[1]
   })
-  // TODO determine port to proxy to and proxy traffic there
-  res.send(`you have privileges ${privileges}`)
+
+  if (privileges.length > 0) {
+    const port = process.env[`SERVICE_${service.toUpperCase()}_PORT`]
+    if (!port) {
+      res.status(500).send(`Configuration error, service ${service} not defined`)
+    }
+    const target = `http://${service}:${port}`
+    proxy.web(req, res, {target})
+  } else {
+    res.status(401).send('Access denied')
+  }
 })
 
 app.get('/auth/google', function (req, res, next) {
   passport.authenticate('google', {
     scope: ['profile', 'email']
-    //  callbackURL: `${process.env.HOST}/auth/google/callback?redir=${req.params.redir}`
   })(req, res, next)
 })
 
@@ -84,10 +104,6 @@ app.get('/auth/google/callback', passport.authenticate('google', {failureRedirec
 app.get('/logout', function (req, res) {
   req.logout()
   res.redirect('/')
-})
-
-app.get('/secure', function (req, res) {
-  res.send('')
 })
 
 const httpsServer = https.createServer({key, cert}, app)
