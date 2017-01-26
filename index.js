@@ -34,7 +34,7 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy
 
 const key = fs.readFileSync('cert/ssl.key', 'utf8')
 const cert = fs.readFileSync('cert/ssl.crt', 'utf8')
-const port = process.env.PORT
+const port = process.env.PORT || 443
 
 const accessControl = JSON.parse(fs.readFileSync('accessControl.json', 'utf-8'))
 
@@ -49,7 +49,7 @@ passport.deserializeUser(function (user, done) {
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: `https://${process.env.HOST}:${process.env.PORT}/auth/google/callback`
+  callbackURL: `https://${process.env.HOST}:${port}/auth/google/callback`
 }, function (accessToken, refreshToken, profile, cb) {
   // TODO handle a response with multiple emails
   // so far i've only seen a responses of the form:
@@ -83,14 +83,14 @@ app.get('/auth/google/callback', passport.authenticate('google', {failureRedirec
 
 app.get('/logout', function (req, res) {
   req.logout()
-  res.redirect(`https://${process.env.HOST}:${process.env.PORT}`)
+  res.redirect(`https://${process.env.HOST}:${port}`)
 })
 
 app.get('*', function (req, res) {
   const service = req.hostname.split('.')[0]
   if (service === 'proxy') return renderFrontPage(req, res)
   if (!req.user) {
-    req.session.redirect = `https://${req.hostname}:${process.env.PORT}${req.url}`
+    req.session.redirect = `https://${req.hostname}:${port}${req.url}`
     return res.redirect('/auth/google')
   }
   const privileges = getPrivileges(req.user.email, service)
