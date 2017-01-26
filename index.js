@@ -23,7 +23,7 @@ const app = express()
 
 app.use(session({
   secret: process.env.SESSION_SECRET,
-  cookie: {domain: '.' + process.env.COOKIE_DOMAIN},
+  cookie: {domain: '.' + process.env.COOKIE_DOMAIN, secure: true},
   resave: false,
   saveUninitialized: true,
   store: new FileStore()
@@ -73,8 +73,9 @@ app.get('/auth/google', function (req, res, next) {
 app.get('/auth/google/callback', passport.authenticate('google', {failureRedirect: '/login'}),
   function (req, res) {
     if (req.session.redirect) {
+      const redirect = req.session.redirect
       req.session.redirect = null
-      res.redirect(req.session.redirect)
+      res.redirect(redirect)
     } else {
       res.redirect('/')
     }
