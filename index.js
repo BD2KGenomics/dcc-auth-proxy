@@ -1,4 +1,5 @@
 // TODO probably should have an http port that just redirects to https
+// TODO set secure flag on cookies
 
 const passport = require('passport')
 const session = require('express-session')
@@ -72,8 +73,8 @@ app.get('/auth/google', function (req, res, next) {
 app.get('/auth/google/callback', passport.authenticate('google', {failureRedirect: '/login'}),
   function (req, res) {
     if (req.session.redirect) {
-      res.redirect(req.session.redirect)
       req.session.redirect = null
+      res.redirect(req.session.redirect)
     } else {
       res.redirect('/')
     }
@@ -121,7 +122,7 @@ const renderFrontPage = function (req, res) {
 const proxyToService = function (req, res, service, privileges) {
   const port = process.env[`SERVICE_${service.toUpperCase()}_PORT`]
   if (!port) {
-    res.status(500).send(`Configuration error, service ${service} not defined`)
+    return res.status(500).send(`Configuration error, service ${service} not defined`)
   }
   const target = `http://${service}:${port}`
   proxy.web(req, res, {
