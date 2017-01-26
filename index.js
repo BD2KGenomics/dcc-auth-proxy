@@ -6,6 +6,7 @@ const session = require('express-session')
 const FileStore = require('session-file-store')(session)
 const express = require('express')
 const fs = require('fs')
+const http = require('http')
 const https = require('https')
 const httpProxy = require('http-proxy')
 const proxy = httpProxy.createProxyServer({})
@@ -135,3 +136,12 @@ const proxyToService = function (req, res, service, privileges) {
 const httpsServer = https.createServer({key, cert}, app)
 httpsServer.listen(port)
 console.log(`server listening on port ${port}`)
+
+if (process.env.HTTP_PORT) {
+  const app = express()
+  app.all('*', function (req, res, next) {
+    res.redirect(`https://${req.hostname}${req.url}`)
+  })
+  console.log(`http server listening on port ${process.env.HTTP_PORT}`)
+  http.createServer().listen(process.env.HTTP_PORT)
+}
