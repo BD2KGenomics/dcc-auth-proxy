@@ -6,11 +6,9 @@ const session = require('express-session')
 const FileStore = require('session-file-store')(session)
 const express = require('express')
 const fs = require('fs')
-const http = require('http')
 const https = require('https')
 const httpProxy = require('http-proxy')
-const proxy = httpProxy.createProxyServer({})
-
+const proxy = httpProxy.createProxyServer({ws: true})
 const requiredEnvVars = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'HOST', 'PORT', 'SESSION_SECRET', 'COOKIE_DOMAIN']
 
 requiredEnvVars.map((envVar) => {
@@ -22,13 +20,15 @@ requiredEnvVars.map((envVar) => {
 
 const app = express()
 
-app.use(session({
+const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET,
   cookie: {domain: '.' + process.env.COOKIE_DOMAIN, secure: true},
   resave: false,
   saveUninitialized: true,
   store: new FileStore()
-}))
+})
+
+app.use(sessionMiddleware)
 app.use(passport.initialize())
 app.use(passport.session())
 const GoogleStrategy = require('passport-google-oauth20').Strategy
@@ -87,7 +87,7 @@ app.get('/logout', function (req, res) {
   res.redirect(`https://${process.env.HOST}:${port}`)
 })
 
-app.get('*', function (req, res) {
+app.all('*', function (req, res) {
   const service = req.hostname.split('.')[0]
   if (service === 'proxy') return renderFrontPage(req, res)
   if (!req.user) {
@@ -129,19 +129,30 @@ const proxyToService = function (req, res, service, privileges) {
   const target = `http://${service}:${port}`
   proxy.web(req, res, {
     target,
-    headers: {dcc_privileges: privileges, dcc_email: req.user.email}
+    headers: {dcc_privileges: privileges, REMOTE_USER: req.user.email.split('@')[0]}
   })
 }
 
 const httpsServer = https.createServer({key, cert}, app)
 httpsServer.listen(port)
-console.log(`server listening on port ${port}`)
+
+httpsServer.on('upgrade', function (req, socket, head) {
+  sessionMiddleware(req, {}, () => {
+    const service = socket.servername.split('.')[0]
+    const port = process.env[`SERVICE_${service.toUpperCase()}_PORT`]
+    const privileges = getPrivileges(req.session.passport.user.email, service)
+    if (privileges.length > 0) {
+      proxy.ws(req, socket, head, {target: `http://${service}:${port}`})
+    }
+  })
+})
 
 if (process.env.HTTP_PORT) {
   const app = express()
   app.all('*', function (req, res, next) {
     res.redirect(`https://${req.hostname}${req.url}`)
   })
-  console.log(`http server listening on port ${process.env.HTTP_PORT}`)
-  http.createServer().listen(process.env.HTTP_PORT)
+  app.listen(process.env.HTTP_PORT, function () {
+    console.log(`http server listening on port ${process.env.HTTP_PORT}`)
+  })
 }
