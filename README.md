@@ -43,6 +43,9 @@ services:
       PORT: 443
       SERVICE_HELLO_PORT: 80
       NODE_ENV: production
+      LDAP_HOST:
+      LDAP_LOGIN: #something like "cn=admin,dc=example,dc=com"
+      LDAP_PASSWORD:
     ports:
       - "443:443"
       - "80:80"
