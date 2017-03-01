@@ -10,6 +10,18 @@ const https = require('https')
 const httpProxy = require('http-proxy')
 const proxy = httpProxy.createProxyServer({ws: true})
 const requiredEnvVars = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'HOST', 'PORT', 'SESSION_SECRET', 'COOKIE_DOMAIN']
+const ldap = require('ldapjs')
+let ldapClient = null
+if (process.env.LDAP_HOST && process.env.LDAP_LOGIN) {
+  ldapClient = ldap.createClient({
+    url: `ldap://${process.env.LDAP_HOST}:389`
+  })
+  ldapClient.bind(process.env.LDAP_LOGIN, process.env.LDAP_PASSWORD, function (err) {
+    if (err) {
+      console.error(err)
+    }
+  })
+}
 
 requiredEnvVars.map((envVar) => {
   if (!process.env[envVar]) {
@@ -106,6 +118,26 @@ app.all('*', function (req, res) {
 // Ex: if accessControl contained {"mike@example.com": [redwood.admin]}
 //     and service was redwood ['admin'] would be returned
 const getPrivileges = function (email, service) {
+  if (ldapClient) {
+    ldapClient.search(process.env.LDAP_LOGIN, function (err, res) {
+      if (err) {
+        console.error('err', err)
+      }
+      res.on('searchEntry', function (entry) {
+        console.log('entry: ' + JSON.stringify(entry.object))
+      })
+      res.on('searchReference', function (referral) {
+        console.log('referral: ' + referral.uris.join())
+      })
+      res.on('error', function (err) {
+        console.error('error: ' + err.message)
+      })
+      res.on('end', function (result) {
+        console.log('status: ' + result.status)
+      })
+    })
+  }
+
   return (accessControl[email] || []).filter((priv) => {
     return priv.startsWith(service)
   }).map((priv) => {
